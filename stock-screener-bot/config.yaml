@@ -1,0 +1,63 @@
+# Daily swing screener — target 5-10% in 5-10 days (NSE cash)
+# Chartink is used because it supports technical price-action scans.
+# Screener.in is better for fundamentals; use it manually as a second filter if needed.
+
+schedule:
+  # Recommended run time: after market close (3:45 PM IST) or before open (9:00 AM IST)
+  timezone: Asia/Kolkata
+
+picks:
+  max_daily_picks: 3          # Top N stocks to recommend
+  min_candidates: 1           # Fail if screener returns fewer than this
+  max_candidates: 40          # Cap total pool before ranking
+
+risk:
+  stop_loss_pct: 3.0          # Default stop below entry (%)
+  target_min_pct: 5.0
+  target_max_pct: 10.0
+
+scans:
+  # Scan 1: Weekly breakout with volume + trend alignment
+  - name: Breakout Momentum
+    weight: 1.0
+    scan_clause: >-
+      ( {cash} ( latest close > 1 week ago high
+      and latest volume > 1.5 * latest sma ( latest volume , 20 )
+      and latest close > latest sma ( latest close , 50 )
+      and latest close > latest sma ( latest close , 200 )
+      and latest close > 100
+      and latest close < 10000 ) )
+
+  # Scan 2: Pullback bounce off 20 EMA in uptrend
+  - name: EMA Pullback
+    weight: 0.9
+    scan_clause: >-
+      ( {cash} ( latest close > latest ema ( latest close , 20 )
+      and 1 day ago close <= 1 day ago ema ( 1 day ago close , 20 )
+      and latest close > latest sma ( latest close , 50 )
+      and latest volume > latest sma ( latest volume , 20 )
+      and latest close > 100
+      and latest close < 10000 ) )
+
+  # Scan 3: Volatility squeeze breakout (BB squeeze proxy)
+  - name: Range Breakout
+    weight: 0.85
+    scan_clause: >-
+      ( {cash} ( latest close > 5 days ago max( 5 , latest high )
+      and latest close > latest sma ( latest close , 20 )
+      and latest volume > 1.3 * latest sma ( latest volume , 20 )
+      and latest close > 100
+      and latest close < 10000 ) )
+
+ranking:
+  # Scoring weights (must sum to ~1.0)
+  volume_ratio: 0.30        # Today's volume vs 20-day avg (from scan filter)
+  momentum_sweet_spot: 0.25 # Prefer 1.5–6% daily move (not overextended)
+  liquidity: 0.20           # Prefer higher rupee turnover
+  setup_weight: 0.15        # Scan type priority
+  price_stability: 0.10     # Penalize extreme % moves (>8%)
+
+notifications:
+  telegram: true
+  sms: false
+  whatsapp: false
