@@ -1,0 +1,29 @@
+# Chartink scan clauses (copy into https://chartink.com/screener/ to verify visually)
+
+## 1. Breakout Momentum (primary)
+Weekly high breakout + volume spike + above 50/200 SMA
+
+```
+( {cash} ( latest close > 1 week ago high and latest volume > 1.5 * latest sma ( latest volume , 20 ) and latest close > latest sma ( latest close , 50 ) and latest close > latest sma ( latest close , 200 ) and latest close > 100 and latest close < 10000 ) )
+```
+
+## 2. EMA Pullback (secondary)
+Pullback to 20 EMA in uptrend, bounce with volume
+
+```
+( {cash} ( latest close > latest ema ( latest close , 20 ) and 1 day ago close <= 1 day ago ema ( 1 day ago close , 20 ) and latest close > latest sma ( latest close , 50 ) and latest volume > latest sma ( latest volume , 20 ) and latest close > 100 and latest close < 10000 ) )
+```
+
+## 3. Range Breakout (tertiary)
+5-day range breakout with volume expansion
+
+```
+( {cash} ( latest close > 5 days ago max( 5 , latest high ) and latest close > latest sma ( latest close , 20 ) and latest volume > 1.3 * latest sma ( latest volume , 20 ) and latest close > 100 and latest close < 10000 ) )
+```
+
+## Optional Screener.in fundamental filter (manual)
+After getting picks, quickly check on screener.in:
+- ROCE > 15%
+- Debt to equity < 1
+- Promoter holding stable
+- No major negative news
