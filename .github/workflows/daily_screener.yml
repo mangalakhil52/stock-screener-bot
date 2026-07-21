@@ -3,8 +3,8 @@ name: Daily Stock Screener Bot
 on:
   schedule:
     # Runs Monday through Friday at 16:00 UTC (9:30 PM IST)
-    - cron: '30 14 * * 1-5'
-  workflow_dispatch: # Enables a manual trigger button
+    - cron: '0 16 * * 1-5'
+  workflow_dispatch: # Enables manual trigger button
 
 jobs:
   run-screener:
@@ -12,10 +12,10 @@ jobs:
 
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
