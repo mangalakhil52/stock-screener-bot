@@ -92,6 +92,20 @@ ranking:
   confluence: 0.10            # Bonus when 2+ scans agree
   price_stability: 0.10       # Penalize extreme % moves (>8%)
 
+# Advanced multi-signal engine (requires yfinance for OHLCV history).
+# Detects fake breakouts, distribution, and scores move probability vs Nifty.
+advanced:
+  enabled: true
+  history_days: 90
+  deep_analyze_top: 20         # Only deep-analyze top N from basic screen (API limit)
+  min_probability: 58          # Reject picks below this composite score
+  max_fake_breakout_risk: 0.55
+  max_fake_move_risk: 0.60
+  reject_grades: ["D"]
+  weights:
+    basic_score: 0.35
+    probability: 0.65
+
 notifications:
   telegram: true
   sms: false

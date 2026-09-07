@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
+from advanced_analyzer import (
+    AdvancedSignals,
+    analyze_batch,
+    passes_advanced_filters,
+)
 from chartink_client import StockCandidate
+from market_data import fetch_history
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -39,6 +48,13 @@ class TradePick:
     confluence: str
     rationale: str
     exit_plan: str
+    probability: float
+    grade: str
+    fake_breakout_risk: float
+    fake_move_risk: float
+    warnings: list[str]
+    confirmations: list[str]
+    advanced_summary: str
 
 
 def aggregate_candidates(candidates: list[StockCandidate]) -> list[AggregatedCandidate]:
@@ -104,10 +120,7 @@ def score_candidate(candidate: AggregatedCandidate, weights: dict) -> float:
 
     liquidity_score = min(turnover / 100_000_000, 1.0)
     setup_score = candidate.setup_weight
-
-    # Bonus when multiple scans agree on the same stock.
     confluence_score = min(candidate.setup_count / 3.0, 1.0)
-
     stability_score = 1.0 if abs_chg <= 8.0 else 0.1
 
     total = (
@@ -137,6 +150,36 @@ def resolve_risk(candidate: AggregatedCandidate, config: dict) -> dict[str, floa
     }
 
 
+def _combined_score(basic: float, signals: AdvancedSignals, config: dict) -> float:
+    adv = config.get("advanced", {})
+    w_basic = float(adv.get("weights", {}).get("basic_score", 0.35))
+    w_prob = float(adv.get("weights", {}).get("probability", 0.65))
+    prob_norm = signals.probability / 100.0
+    penalty = (signals.fake_breakout_risk * 0.15) + (signals.fake_move_risk * 0.10)
+    return round(basic * w_basic + prob_norm * w_prob - penalty, 4)
+
+
+def _run_advanced_analysis(
+    candidates: list[AggregatedCandidate],
+    config: dict,
+) -> dict[str, AdvancedSignals]:
+    adv = config.get("advanced", {})
+    if not adv.get("enabled", True):
+        return {}
+
+    symbols = [c.symbol for c in candidates]
+    days = int(adv.get("history_days", 90))
+    logger.info("Running advanced analysis on %s symbols...", len(symbols))
+
+    history, benchmark = fetch_history(symbols, days=days)
+    setups = {c.symbol: c.primary_setup for c in candidates}
+    signals = analyze_batch(symbols, history, benchmark, setups)
+
+    loaded = sum(1 for s in symbols if s in history)
+    logger.info("Loaded OHLCV for %s/%s symbols", loaded, len(symbols))
+    return signals
+
+
 def build_picks(
     candidates: list[StockCandidate],
     config: dict,
@@ -144,24 +187,56 @@ def build_picks(
 ) -> list[TradePick]:
     picks_cfg = config.get("picks", {})
     ranking_weights = config.get("ranking", {})
+    adv_cfg = config.get("advanced", {})
     blocked = blocked_symbols or set()
 
     max_picks = int(picks_cfg.get("max_daily_picks", 3))
     max_candidates = int(picks_cfg.get("max_candidates", 40))
+    deep_top = int(adv_cfg.get("deep_analyze_top", 20))
 
     aggregated = aggregate_candidates(candidates)
     eligible = [
         c for c in aggregated if passes_filters(c, config) and c.symbol not in blocked
     ]
 
-    scored: list[tuple[AggregatedCandidate, float]] = [
+    basic_scored: list[tuple[AggregatedCandidate, float]] = [
         (c, score_candidate(c, ranking_weights)) for c in eligible
     ]
-    scored.sort(key=lambda x: x[1], reverse=True)
-    top = scored[:max_candidates][:max_picks]
+    basic_scored.sort(key=lambda x: x[1], reverse=True)
+
+    # Deep-analyze the top N from basic screening before final ranking.
+    to_analyze = [c for c, _ in basic_scored[:deep_top]]
+    advanced_signals = _run_advanced_analysis(to_analyze, config)
+    use_advanced = adv_cfg.get("enabled", True) and bool(advanced_signals)
+    if adv_cfg.get("enabled", True) and not advanced_signals:
+        logger.warning("Advanced analysis returned no data — falling back to basic scoring")
+
+    final_scored: list[tuple[AggregatedCandidate, float, AdvancedSignals | None]] = []
+    for candidate, basic in basic_scored:
+        signals = advanced_signals.get(candidate.symbol) if use_advanced else None
+        if use_advanced:
+            if signals is None:
+                continue
+            if not passes_advanced_filters(signals, config):
+                logger.info(
+                    "Rejected %s: P=%.0f%% grade=%s fake_bo=%.2f fake_mv=%.2f",
+                    candidate.symbol,
+                    signals.probability,
+                    signals.grade,
+                    signals.fake_breakout_risk,
+                    signals.fake_move_risk,
+                )
+                continue
+            combined = _combined_score(basic, signals, config)
+        else:
+            combined = basic
+        final_scored.append((candidate, combined, signals))
+
+    final_scored.sort(key=lambda x: x[1], reverse=True)
+    top = final_scored[:max_candidates][:max_picks]
 
     results: list[TradePick] = []
-    for candidate, score in top:
+    for candidate, score, signals in top:
         risk = resolve_risk(candidate, config)
         entry = candidate.close
         stop_pct = risk["stop_loss_pct"]
@@ -181,12 +256,20 @@ def build_picks(
             if candidate.setup_count > 1
             else candidate.primary_setup
         )
-        rationale = _build_rationale(candidate)
+        rationale = _build_rationale(candidate, signals)
         exit_plan = (
             f"Book {partial_pct:.0f}% at ₹{partial_exit:,.2f} (+{target_min:.0f}%). "
             f"Move stop to entry once price crosses ₹{breakeven_stop:,.2f}. "
             f"Trail remainder toward ₹{target_high:,.2f}."
         )
+
+        prob = signals.probability if signals else 0.0
+        grade = signals.grade if signals else "?"
+        fake_bo = signals.fake_breakout_risk if signals else 0.0
+        fake_mv = signals.fake_move_risk if signals else 0.0
+        warnings = signals.warnings if signals else []
+        confirmations = signals.confirmations if signals else []
+        adv_summary = signals.summary if signals else "Advanced analysis disabled"
 
         results.append(
             TradePick(
@@ -207,18 +290,30 @@ def build_picks(
                 confluence=confluence,
                 rationale=rationale,
                 exit_plan=exit_plan,
+                probability=prob,
+                grade=grade,
+                fake_breakout_risk=fake_bo,
+                fake_move_risk=fake_mv,
+                warnings=warnings,
+                confirmations=confirmations,
+                advanced_summary=adv_summary,
             )
         )
     return results
 
 
-def _build_rationale(candidate: AggregatedCandidate) -> str:
+def _build_rationale(candidate: AggregatedCandidate, signals: AdvancedSignals | None) -> str:
     base = {
         "Breakout Momentum": "Weekly high breakout with volume and 50/200 SMA trend support.",
         "EMA Pullback": "Pullback to 20 EMA in uptrend; bounce with volume confirmation.",
         "Range Breakout": "5-day range breakout with rising volume — squeeze expansion play.",
     }.get(candidate.primary_setup, "Matches configured swing setup criteria.")
 
+    parts = [base]
     if candidate.setup_count > 1:
-        return f"{base} Confluence: flagged by {candidate.setup_count} independent scans."
-    return base
+        parts.append(f"Confluence: {candidate.setup_count} independent scans agree.")
+    if signals and signals.confirmations:
+        parts.append(signals.confirmations[0])
+    if signals and signals.warnings:
+        parts.append(f"Caution: {signals.warnings[0]}")
+    return " ".join(parts)

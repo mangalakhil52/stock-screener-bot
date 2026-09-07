@@ -92,6 +92,19 @@ Stocks are scored on:
 - **7-day cooldown** — won't re-recommend a symbol picked in the last week
 - **Exit plan in alerts** — book 50% at T1, move stop to entry after +4%
 
+### Advanced signal engine (new)
+
+After basic Chartink screening, the bot downloads **90 days of OHLCV** (via yfinance) and runs a multi-signal analysis humans can't do manually on 20+ stocks:
+
+| Signal | What it detects |
+|--------|-----------------|
+| **Fake breakout** | Weak close, long upper wick, fading volume, RSI exhaustion, failed intraday break |
+| **Fake move / distribution** | High volume + flat price, gap-up fades, churning, falling price + rising volume |
+| **Probability score** | Composite 0–100% from trend, volume quality, RSI sweet spot, Nifty relative strength |
+| **Grade A–D** | A = high probability + low trap risk; D = rejected |
+
+Picks below **58% probability** or with high fake-breakout risk are automatically filtered out.
+
 ### Price filter (₹100 – ₹10,000)
 
 Every Chartink scan includes `latest close > 100 and latest close < 10000`. This is intentional:
@@ -175,7 +188,9 @@ stock-screener-bot/
 │   ├── main.py          # Orchestrator
 │   ├── chartink_client.py
 │   ├── ranker.py
-│   ├── trade_history.py # Cooldown / pick logging
+│   ├── advanced_analyzer.py  # Fake breakout / probability engine
+│   ├── market_data.py        # yfinance OHLCV fetch
+│   ├── trade_history.py      # Cooldown / pick logging
 │   └── notifier.py
 └── scans/
     └── chartink_queries.txt

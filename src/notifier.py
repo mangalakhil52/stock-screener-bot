@@ -35,16 +35,21 @@ def format_message(picks: list[TradePick], total_scanned: int) -> str:
         target_min_pct = round((pick.target_low / pick.entry - 1) * 100, 1) if pick.entry else 0
         target_max_pct = round((pick.target_high / pick.entry - 1) * 100, 1) if pick.entry else 0
         pick_lines = [
-            f"*#{idx} {pick.symbol}* ({pick.setup})",
+            f"*#{idx} {pick.symbol}* [{pick.grade}] ({pick.setup})",
+            f"   🎯 Probability: *{pick.probability:.0f}%* | Score: {pick.score:.2f}",
             f"   Price: ₹{pick.price:,.2f} ({pick.change_pct:+.2f}%)",
             f"   Entry: ₹{pick.entry:,.2f}",
             f"   Stop: ₹{pick.stop_loss:,.2f} (-{stop_pct:.1f}%)",
             f"   Target: ₹{pick.target_low:,.2f} – ₹{pick.target_high:,.2f} "
             f"(+{target_min_pct:.0f}–{target_max_pct:.0f}%)",
-            f"   Score: {pick.score:.2f} | Vol: {pick.volume:,.0f}",
+            f"   Risk: fake BO {pick.fake_breakout_risk:.0%} | fake move {pick.fake_move_risk:.0%}",
         ]
         if pick.setup_count > 1:
             pick_lines.append(f"   Confluence: {pick.confluence}")
+        if pick.confirmations:
+            pick_lines.append(f"   ✓ {pick.confirmations[0]}")
+        if pick.warnings:
+            pick_lines.append(f"   ⚠ {pick.warnings[0]}")
         pick_lines.extend(
             [
                 f"   _{pick.rationale}_",

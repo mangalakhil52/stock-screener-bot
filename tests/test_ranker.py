@@ -61,6 +61,7 @@ BASE_CONFIG = {
         "confluence": 0.10,
         "price_stability": 0.10,
     },
+    "advanced": {"enabled": False},
 }
 
 
