@@ -31,20 +31,30 @@ def format_message(picks: list[TradePick], total_scanned: int) -> str:
     ]
 
     for idx, pick in enumerate(picks, start=1):
-        lines.extend(
+        stop_pct = round((1 - pick.stop_loss / pick.entry) * 100, 1) if pick.entry else 0
+        target_min_pct = round((pick.target_low / pick.entry - 1) * 100, 1) if pick.entry else 0
+        target_max_pct = round((pick.target_high / pick.entry - 1) * 100, 1) if pick.entry else 0
+        pick_lines = [
+            f"*#{idx} {pick.symbol}* ({pick.setup})",
+            f"   Price: ₹{pick.price:,.2f} ({pick.change_pct:+.2f}%)",
+            f"   Entry: ₹{pick.entry:,.2f}",
+            f"   Stop: ₹{pick.stop_loss:,.2f} (-{stop_pct:.1f}%)",
+            f"   Target: ₹{pick.target_low:,.2f} – ₹{pick.target_high:,.2f} "
+            f"(+{target_min_pct:.0f}–{target_max_pct:.0f}%)",
+            f"   Score: {pick.score:.2f} | Vol: {pick.volume:,.0f}",
+        ]
+        if pick.setup_count > 1:
+            pick_lines.append(f"   Confluence: {pick.confluence}")
+        pick_lines.extend(
             [
-                f"*#{idx} {pick.symbol}* ({pick.setup})",
-                f"   Price: ₹{pick.price:,.2f} ({pick.change_pct:+.2f}%)",
-                f"   Entry: ₹{pick.entry:,.2f}",
-                f"   Stop: ₹{pick.stop_loss:,.2f} (-3%)",
-                f"   Target: ₹{pick.target_low:,.2f} – ₹{pick.target_high:,.2f} (+5–10%)",
-                f"   Score: {pick.score:.2f} | Vol: {pick.volume:,.0f}",
                 f"   _{pick.rationale}_",
+                f"   Exit: {pick.exit_plan}",
                 "",
             ]
         )
+        lines.extend(pick_lines)
 
-    lines.append("📌 Hold horizon: 5–10 trading days. Exit if stop hits.")
+    lines.append("📌 Hold 5–10 days. Book partial at T1; move stop to entry after +4%.")
     return "\n".join(lines)
 
 

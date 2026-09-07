@@ -12,6 +12,7 @@ from dotenv import load_dotenv  # noqa: F401 — loads .env into os.environ
 from chartink_client import ChartinkClient
 from notifier import format_message, notify
 from ranker import build_picks
+from trade_history import append_picks, load_history, recent_symbols
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
@@ -30,6 +31,12 @@ def load_config() -> dict:
         return yaml.safe_load(fh)
 
 
+def _history_path(config: dict) -> Path:
+    cooldown_cfg = config.get("cooldown", {})
+    rel = cooldown_cfg.get("history_file", "logs/pick_history.json")
+    return ROOT / rel
+
+
 def main() -> int:
     setup_logging()
     load_dotenv(ROOT / ".env")
@@ -38,12 +45,21 @@ def main() -> int:
     config = load_config()
     client = ChartinkClient()
 
+    cooldown_cfg = config.get("cooldown", {})
+    history_path = _history_path(config)
+    history = load_history(history_path)
+    blocked: set[str] = set()
+    if cooldown_cfg.get("enabled", True):
+        blocked = recent_symbols(history, int(cooldown_cfg.get("days", 7)))
+        if blocked:
+            logger.info("Cooldown active — skipping recent picks: %s", sorted(blocked))
+
     logger.info("Running Chartink scans...")
     candidates = client.run_all_scans(config.get("scans", []))
     total = len(candidates)
     logger.info("Total raw hits: %s", total)
 
-    unique_count = len(set(c.symbol for c in candidates))
+    unique_count = len({c.symbol for c in candidates})
 
     if total == 0:
         logger.warning("No stocks matched any scan today")
@@ -53,7 +69,13 @@ def main() -> int:
             logger.warning("%s — set up .env for Telegram alerts", exc)
         return 0
 
-    picks = build_picks(candidates, config)
+    picks = build_picks(candidates, config, blocked_symbols=blocked)
+    if not picks and blocked:
+        logger.warning(
+            "All candidates were in cooldown (%s). Consider raising cooldown.days or waiting.",
+            sorted(blocked),
+        )
+
     logger.info("Top picks: %s", [p.symbol for p in picks])
 
     console_msg = format_message(picks, unique_count)
@@ -61,6 +83,8 @@ def main() -> int:
 
     try:
         notify(picks, unique_count, config)
+        if picks:
+            append_picks(history_path, picks)
     except RuntimeError as exc:
         logger.warning("%s — copy .env.example to .env and add Telegram credentials", exc)
     return 0
