@@ -35,6 +35,10 @@ risk:
   target_max_pct: 10.0
   partial_exit_pct: 50.0       # Book half at first target
   breakeven_after_pct: 4.0     # Move stop to entry after this gain
+  use_atr_stops: true           # Dynamic ATR-based stop (overrides fixed %)
+  atr_stop_multiplier: 1.5
+  min_stop_pct: 2.0
+  max_stop_pct: 6.0
   # Setup-specific risk — tighter stops for pullbacks, wider for breakouts.
   by_setup:
     Breakout Momentum:
@@ -92,19 +96,45 @@ ranking:
   confluence: 0.10            # Bonus when 2+ scans agree
   price_stability: 0.10       # Penalize extreme % moves (>8%)
 
-# Advanced multi-signal engine (requires yfinance for OHLCV history).
-# Detects fake breakouts, distribution, and scores move probability vs Nifty.
+# Market regime gate — skip all picks on bearish Nifty days.
+regime:
+  enabled: true
+  skip_bearish_days: true
+  neutral_probability_boost: 5.0   # Raise min probability in neutral markets
+  bearish_probability_boost: 12.0
+
+# 7-layer ensemble engine (fake breakout, MC, walk-forward, MTF, Wyckoff).
 advanced:
   enabled: true
   history_days: 90
-  deep_analyze_top: 20         # Only deep-analyze top N from basic screen (API limit)
-  min_probability: 58          # Reject picks below this composite score
-  max_fake_breakout_risk: 0.55
-  max_fake_move_risk: 0.60
-  reject_grades: ["D"]
+  deep_analyze_top: 20
+  min_probability: 62            # Stricter bar (was 58)
+  max_fake_breakout_risk: 0.50
+  max_fake_move_risk: 0.55
+  reject_grades: ["D", "C"]
   weights:
-    basic_score: 0.35
-    probability: 0.65
+    basic_score: 0.25
+    ensemble: 0.75
+
+ensemble:
+  min_ensemble_score: 0.62
+  min_monte_carlo_win_rate: 0.50
+  min_walk_forward_edge: 0.40
+  min_mtf_alignment: 0.50
+  allowed_tiers: ["ELITE", "STRONG", "PASS"]
+  elite_ensemble_score: 0.78
+  strong_ensemble_score: 0.68
+  elite_monte_carlo: 0.58
+  strong_monte_carlo: 0.52
+
+monte_carlo:
+  simulations: 500
+  horizon_days: 10
+
+diversification:
+  enabled: true
+  max_per_sector: 1              # No two picks from same sector
+  max_correlation: 0.75          # Reject highly correlated pairs
 
 notifications:
   telegram: true

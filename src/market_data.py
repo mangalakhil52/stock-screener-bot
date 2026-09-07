@@ -66,6 +66,7 @@ def fetch_history(
 
     if len(all_tickers) == 1:
         frame = _flatten_columns(raw.copy())
+        frame.index = pd.to_datetime(frame.index)
         if all_tickers[0] == benchmark:
             benchmark_df = frame.tail(days).copy()
         else:
@@ -77,6 +78,7 @@ def fetch_history(
             sub = raw.xs(ticker, axis=1, level=1).copy()
             sub = _flatten_columns(sub).dropna(how="all")
             if not sub.empty:
+                sub.index = pd.to_datetime(sub.index)
                 result[symbol] = sub.tail(days).copy()
         except (KeyError, ValueError):
             try:
@@ -90,6 +92,7 @@ def fetch_history(
     try:
         bench = raw.xs(benchmark, axis=1, level=1).copy()
         benchmark_df = _flatten_columns(bench).tail(days).copy()
+        benchmark_df.index = pd.to_datetime(benchmark_df.index)
     except (KeyError, ValueError):
         try:
             benchmark_df = _flatten_columns(raw[benchmark].copy()).tail(days).copy()
