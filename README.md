@@ -92,18 +92,20 @@ Stocks are scored on:
 - **7-day cooldown** — won't re-recommend a symbol picked in the last week
 - **Exit plan in alerts** — book 50% at T1, move stop to entry after +4%
 
-### Advanced signal engine (new)
+### 7-layer defense system
 
-After basic Chartink screening, the bot downloads **90 days of OHLCV** (via yfinance) and runs a multi-signal analysis humans can't do manually on 20+ stocks:
+No system wins 100% — this bot **prefers no trade over a bad trade** using seven filter layers:
 
-| Signal | What it detects |
-|--------|-----------------|
-| **Fake breakout** | Weak close, long upper wick, fading volume, RSI exhaustion, failed intraday break |
-| **Fake move / distribution** | High volume + flat price, gap-up fades, churning, falling price + rising volume |
-| **Probability score** | Composite 0–100% from trend, volume quality, RSI sweet spot, Nifty relative strength |
-| **Grade A–D** | A = high probability + low trap risk; D = rejected |
+1. Chartink scans → 2. Nifty regime gate → 3. Fake breakout traps → 4. Multi-timeframe alignment → 5. Walk-forward historical edge → 6. Monte Carlo (500 paths) → 7. Ensemble scoring + diversification
 
-Picks below **58% probability** or with high fake-breakout risk are automatically filtered out.
+| Module | Purpose |
+|--------|---------|
+| `regime_filter.py` | Skip all picks on bearish Nifty days |
+| `ensemble_engine.py` | Wyckoff, S/R, confidence tiers (ELITE/STRONG/PASS) |
+| `monte_carlo.py` | P(hit target before stop) via bootstrap simulation |
+| `diversification.py` | Max 1 pick/sector, correlation < 0.75 |
+
+Picks must pass: min **62%** probability, ensemble ≥ 62%, MC win ≥ 50%, grade A or B only.
 
 ### Price filter (₹100 – ₹10,000)
 
@@ -188,7 +190,12 @@ stock-screener-bot/
 │   ├── main.py          # Orchestrator
 │   ├── chartink_client.py
 │   ├── ranker.py
-│   ├── advanced_analyzer.py  # Fake breakout / probability engine
+│   ├── advanced_analyzer.py  # Ensemble wrapper
+│   ├── ensemble_engine.py    # 7-layer scoring engine
+│   ├── indicators.py         # Technical indicators
+│   ├── regime_filter.py      # Nifty market regime gate
+│   ├── monte_carlo.py        # Path simulation
+│   ├── diversification.py    # Sector & correlation filter
 │   ├── market_data.py        # yfinance OHLCV fetch
 │   ├── trade_history.py      # Cooldown / pick logging
 │   └── notifier.py
