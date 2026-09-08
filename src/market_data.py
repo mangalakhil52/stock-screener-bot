@@ -100,3 +100,22 @@ def fetch_history(
             logger.warning("Could not load Nifty benchmark data")
 
     return result, benchmark_df
+
+
+def fetch_benchmark(days: int = 365) -> pd.DataFrame | None:
+    """Download Nifty benchmark OHLCV only."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        return None
+
+    try:
+        raw = yf.download(_BENCHMARK, period="2y", progress=False, auto_adjust=True)
+        if raw is None or raw.empty:
+            return None
+        frame = _flatten_columns(raw.copy())
+        frame.index = pd.to_datetime(frame.index)
+        return frame.tail(days).copy()
+    except Exception:
+        logger.exception("Failed to fetch benchmark")
+        return None

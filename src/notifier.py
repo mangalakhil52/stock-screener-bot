@@ -18,6 +18,7 @@ def format_message(
     picks: list[TradePick],
     total_scanned: int,
     regime_summary: str | None = None,
+    ml_summary: str | None = None,
 ) -> str:
     now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST")
 
@@ -36,6 +37,8 @@ def format_message(
     ]
     if regime_summary:
         lines.append(f"📈 Market regime: {regime_summary}\n")
+    if ml_summary:
+        lines.append(f"🤖 ML model: {ml_summary}\n")
     lines.append("⚠️ Not financial advice. Verify on chart before buying.\n")
 
     for idx, pick in enumerate(picks, start=1):
@@ -46,6 +49,7 @@ def format_message(
             f"*#{idx} {pick.symbol}* [{pick.confidence_tier}] grade {pick.grade} ({pick.setup})",
             f"   🎯 Probability: *{pick.probability:.0f}%* | Ensemble: {pick.ensemble_score:.0%}",
             f"   📊 MC win: {pick.monte_carlo_win_rate:.0%} | Hist edge: {pick.walk_forward_edge:.0%} | MTF: {pick.mtf_alignment:.0%}",
+            f"   🤖 ML market: {pick.ml_score:.0%} win probability (daily-trained)",
             f"   Price: ₹{pick.price:,.2f} ({pick.change_pct:+.2f}%)",
             f"   Entry: ₹{pick.entry:,.2f} | Support: ₹{pick.support_level:,.0f} | Resist: ₹{pick.resistance_level:,.0f}",
             f"   Stop: ₹{pick.stop_loss:,.2f} (-{stop_pct:.1f}%)",
@@ -125,8 +129,16 @@ def notify(picks: list[TradePick], total_scanned: int, config: dict) -> None:
     notify_cfg = config.get("notifications", {})
     regime = config.get("_market_regime")
     regime_summary = regime.summary if regime else None
+    ml_meta = config.get("_ml_meta")
+    ml_summary = None
+    if ml_meta:
+        ml_summary = (
+            f"{ml_meta.get('samples', 0):,} samples | "
+            f"AUC {ml_meta.get('test_auc', 0):.2f} | "
+            f"trained {ml_meta.get('trained_at', '')[:10]}"
+        )
 
-    msg = format_message(picks, total_scanned, regime_summary)
+    msg = format_message(picks, total_scanned, regime_summary, ml_summary)
     plain_message = msg.replace("*", "").replace("_", "")
 
     sent_any = False

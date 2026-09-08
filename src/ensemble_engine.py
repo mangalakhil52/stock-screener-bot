@@ -22,6 +22,11 @@ from indicators import (
 )
 from monte_carlo import simulate_win_probability
 
+try:
+    from ml_scorer import predict_probability as ml_predict
+except ImportError:
+    ml_predict = None
+
 
 @dataclass
 class FeatureVector:
@@ -68,6 +73,7 @@ class EnsembleResult:
     trend_strength: float
     volume_quality: float
     relative_strength: float
+    ml_score: float                 # daily-trained market model P(win)
     grade: str
     warnings: list[str] = field(default_factory=list)
     confirmations: list[str] = field(default_factory=list)
@@ -381,6 +387,7 @@ def analyze_ensemble(
             trend_strength=0,
             volume_quality=0,
             relative_strength=0,
+            ml_score=0,
             grade="D",
             warnings=["Insufficient history"],
             veto_reasons=["Insufficient history"],
@@ -436,8 +443,29 @@ def analyze_ensemble(
     )
     ensemble = _ml_ensemble_score(features)
 
-    # Blend rule + ensemble into final probability.
-    probability = 0.4 * rule_prob + 0.6 * (ensemble * 100)
+    # Daily-trained market ML model (whole NSE universe).
+    ml_score = 0.5
+    ml_cfg = config.get("ml", {})
+    if ml_cfg.get("enabled", True) and ml_predict is not None:
+        from pathlib import Path
+
+        root = Path(config.get("_root", "."))
+        ml_pred = ml_predict(df, benchmark, root, config)
+        if ml_pred is not None:
+            ml_score = ml_pred
+            if ml_score >= 0.65:
+                confirmations.append(f"ML market model: {ml_score:.0%} win probability")
+            elif ml_score < 0.45:
+                warnings.append(f"ML market model: only {ml_score:.0%} win probability")
+
+    # Blend rule + ensemble + ML into final probability.
+    ml_weight = float(ml_cfg.get("weight_in_probability", 0.25))
+    ens_weight = 1.0 - ml_weight - 0.30
+    probability = (
+        0.30 * rule_prob
+        + ens_weight * (ensemble * 100)
+        + ml_weight * (ml_score * 100)
+    )
     probability = float(np.clip(probability, 0, 99))
 
     tier = _confidence_tier(ensemble, mc_win, probability, fake_bo, fake_mv, warnings, config)
@@ -451,6 +479,9 @@ def analyze_ensemble(
         veto.append(f"Historical edge {wf_edge:.0%} on this stock")
     if ensemble < float(ens_cfg.get("min_ensemble_score", 0.62)):
         veto.append(f"Ensemble score {ensemble:.0%} below threshold")
+    min_ml = float(ml_cfg.get("min_probability", 0.48))
+    if ml_cfg.get("enabled", True) and ml_score < min_ml:
+        veto.append(f"ML market score {ml_score:.0%} below {min_ml:.0%}")
 
     allowed_tiers = set(ens_cfg.get("allowed_tiers", ["ELITE", "STRONG", "PASS"]))
     if tier not in allowed_tiers:
@@ -473,6 +504,7 @@ def analyze_ensemble(
         trend_strength=round(trend, 3),
         volume_quality=round(vol_q, 3),
         relative_strength=round(rs, 3),
+        ml_score=round(ml_score, 4),
         grade=_grade(probability, fake_bo, fake_mv),
         warnings=warnings[:5],
         confirmations=confirmations[:5],

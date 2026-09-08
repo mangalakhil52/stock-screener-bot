@@ -57,6 +57,7 @@ class TradePick:
     fake_move_risk: float
     support_level: float
     resistance_level: float
+    ml_score: float
     warnings: list[str]
     confirmations: list[str]
     advanced_summary: str
@@ -339,6 +340,7 @@ def build_picks(
                 fake_move_risk=signals.fake_move_risk if signals else 0.0,
                 support_level=signals.support_level if signals else 0.0,
                 resistance_level=signals.resistance_level if signals else 0.0,
+                ml_score=signals.ml_score if signals else 0.0,
                 warnings=signals.warnings if signals else [],
                 confirmations=signals.confirmations if signals else [],
                 advanced_summary=signals.summary if signals else "Basic mode",

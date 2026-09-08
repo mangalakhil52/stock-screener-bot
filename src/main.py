@@ -43,6 +43,21 @@ def main() -> int:
     logger = logging.getLogger("main")
 
     config = load_config()
+    config["_root"] = str(ROOT)
+
+    # Daily self-training on whole NSE universe (runs once per day before scans).
+    from ml_trainer import ensure_daily_model
+
+    ml_meta = ensure_daily_model(ROOT, config)
+    if ml_meta:
+        config["_ml_meta"] = ml_meta
+        logger.info(
+            "ML model ready — %s samples, AUC %.3f, trained %s",
+            ml_meta.get("samples"),
+            ml_meta.get("test_auc", 0),
+            ml_meta.get("trained_at", "")[:10],
+        )
+
     client = ChartinkClient()
 
     cooldown_cfg = config.get("cooldown", {})

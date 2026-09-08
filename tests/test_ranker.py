@@ -62,6 +62,7 @@ BASE_CONFIG = {
         "price_stability": 0.10,
     },
     "advanced": {"enabled": False},
+    "ml": {"enabled": False},
 }
 
 
