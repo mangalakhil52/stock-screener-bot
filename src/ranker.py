@@ -198,6 +198,10 @@ def _run_advanced_analysis(
     regime = assess_regime(benchmark, config)
     config["_market_regime"] = regime
     config["_regime_probability_boost"] = regime.min_probability_boost
+    config["_regime_min_relative_strength"] = regime.min_relative_strength
+    config["_regime_min_ml_score"] = regime.min_ml_score
+    config["_regime_allowed_tiers"] = regime.allowed_tiers
+    config["_regime_max_picks"] = regime.max_picks
 
     loaded = sum(1 for s in symbols if s in history)
     logger.info(
@@ -235,8 +239,11 @@ def build_picks(
     advanced_signals, history, regime = _run_advanced_analysis(to_analyze, config)
 
     if regime and not regime.trade_allowed:
-        logger.warning("Market regime BEARISH — no picks today (%s)", regime.summary)
+        logger.warning("Market regime blocked — no picks today (%s)", regime.summary)
         return []
+
+    regime_label = regime.label if regime else "NEUTRAL"
+    regime_mode = regime.mode if regime else "normal"
 
     use_advanced = adv_cfg.get("enabled", True) and bool(advanced_signals)
     if adv_cfg.get("enabled", True) and not advanced_signals:
@@ -261,6 +268,35 @@ def build_picks(
                     signals.veto_reasons,
                 )
                 continue
+            # Bearish selective: only stocks beating Nifty with strong ML conviction.
+            if regime_mode == "selective":
+                min_rs = float(config.get("_regime_min_relative_strength", 0))
+                min_ml = float(config.get("_regime_min_ml_score", 0))
+                allowed_tiers = config.get("_regime_allowed_tiers") or []
+                if signals.relative_strength < min_rs:
+                    logger.info(
+                        "Rejected %s: relative strength %.0f%% < %.0f%% (bearish selective)",
+                        candidate.symbol,
+                        signals.relative_strength * 100,
+                        min_rs * 100,
+                    )
+                    continue
+                if signals.ml_score < min_ml:
+                    logger.info(
+                        "Rejected %s: ML %.0f%% < %.0f%% (bearish selective)",
+                        candidate.symbol,
+                        signals.ml_score * 100,
+                        min_ml * 100,
+                    )
+                    continue
+                if allowed_tiers and signals.confidence_tier not in allowed_tiers:
+                    logger.info(
+                        "Rejected %s: tier %s not in %s (bearish selective)",
+                        candidate.symbol,
+                        signals.confidence_tier,
+                        allowed_tiers,
+                    )
+                    continue
             combined = _combined_score(basic, signals, config)
         else:
             combined = basic
@@ -279,6 +315,9 @@ def build_picks(
         diversified = final_scored
 
     top = diversified[:max_picks]
+    regime_max = config.get("_regime_max_picks")
+    if regime_max is not None and regime_max > 0:
+        top = top[:regime_max]
 
     results: list[TradePick] = []
     for candidate, score, signals in top:
