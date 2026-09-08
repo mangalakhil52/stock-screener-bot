@@ -100,7 +100,7 @@ No system wins 100% — this bot **prefers no trade over a bad trade** using sev
 
 | Module | Purpose |
 |--------|---------|
-| `regime_filter.py` | Skip all picks on bearish Nifty days |
+| `regime_filter.py` | Bearish **selective** mode — index-beating stocks only |
 | `ensemble_engine.py` | Wyckoff, S/R, confidence tiers (ELITE/STRONG/PASS) |
 | `monte_carlo.py` | P(hit target before stop) via bootstrap simulation |
 | `diversification.py` | Max 1 pick/sector, correlation < 0.75 |

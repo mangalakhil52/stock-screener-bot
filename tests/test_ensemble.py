@@ -84,9 +84,36 @@ class EnsembleTests(unittest.TestCase):
 
     def test_regime_bullish_on_uptrend(self):
         bench = _make_ohlcv(80, base=20000, trend=0.002)
-        regime = assess_regime(bench, {"regime": {"enabled": True, "skip_bearish_days": True}})
+        regime = assess_regime(bench, {"regime": {"enabled": True, "bearish_mode": "selective"}})
         self.assertIn(regime.label, ("BULLISH", "NEUTRAL"))
         self.assertTrue(regime.trade_allowed)
+
+    def test_bearish_selective_still_allows_trades(self):
+        bench = _make_ohlcv(80, base=20000, trend=-0.004)
+        regime = assess_regime(
+            bench,
+            {
+                "regime": {
+                    "enabled": True,
+                    "bearish_mode": "selective",
+                    "skip_bearish_days": False,
+                }
+            },
+        )
+        if regime.label == "BEARISH":
+            self.assertTrue(regime.trade_allowed)
+            self.assertEqual(regime.mode, "selective")
+            self.assertGreater(regime.min_relative_strength, 0)
+
+    def test_bearish_strict_blocks_trades(self):
+        bench = _make_ohlcv(80, base=20000, trend=-0.004)
+        regime = assess_regime(
+            bench,
+            {"regime": {"enabled": True, "bearish_mode": "strict"}},
+        )
+        if regime.label == "BEARISH":
+            self.assertFalse(regime.trade_allowed)
+            self.assertEqual(regime.mode, "blocked")
 
     def test_monte_carlo_returns_probability(self):
         df = _make_ohlcv()

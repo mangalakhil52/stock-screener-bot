@@ -96,12 +96,18 @@ ranking:
   confluence: 0.10            # Bonus when 2+ scans agree
   price_stability: 0.10       # Penalize extreme % moves (>8%)
 
-# Market regime gate — skip all picks on bearish Nifty days.
+# Market regime — in bearish markets use SELECTIVE mode (index-beating stocks only).
+# Set bearish_mode: strict to restore old behavior (zero picks on bearish days).
 regime:
   enabled: true
-  skip_bearish_days: true
-  neutral_probability_boost: 5.0   # Raise min probability in neutral markets
-  bearish_probability_boost: 12.0
+  bearish_mode: selective          # selective | strict
+  skip_bearish_days: false         # legacy flag; only used if bearish_mode: strict
+  neutral_probability_boost: 5.0
+  bearish_probability_boost: 8.0   # min probability += 8% in bearish market
+  bearish_min_relative_strength: 0.65   # stock must beat Nifty (relative strength)
+  bearish_min_ml_score: 0.50           # higher ML bar in bearish market
+  bearish_allowed_tiers: ["ELITE", "STRONG"]
+  bearish_max_picks: 2                  # max 2 picks when Nifty is weak
 
 # 7-layer ensemble engine (fake breakout, MC, walk-forward, MTF, Wyckoff).
 advanced:

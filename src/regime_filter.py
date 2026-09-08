@@ -1,8 +1,8 @@
-"""Market regime detection — gate trades on unfavorable conditions."""
+"""Market regime detection — adjust strictness, don't block bearish markets entirely."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -13,13 +13,26 @@ from indicators import returns_pct, rsi, sma
 class MarketRegime:
     label: str              # BULLISH / NEUTRAL / BEARISH
     score: float            # 0–1
+    mode: str               # normal / selective / blocked
     trade_allowed: bool
-    min_probability_boost: float  # raise bar in weak regimes
-    reasons: list[str]
+    min_probability_boost: float
+    min_relative_strength: float    # 0–1, stock must clear this in bearish selective mode
+    min_ml_score: float             # extra ML floor in bearish selective mode
+    allowed_tiers: list[str] = field(default_factory=list)
+    max_picks: int | None = None    # cap picks in weak regimes
+    reasons: list[str] = field(default_factory=list)
 
     @property
     def summary(self) -> str:
-        return f"{self.label} ({self.score:.0%}) — {', '.join(self.reasons[:2])}"
+        mode_note = ""
+        if self.mode == "selective":
+            mode_note = " | selective stock-picking (relative strength required)"
+        elif self.mode == "blocked":
+            mode_note = " | no new picks"
+        parts = [f"{self.label} ({self.score:.0%})"]
+        if self.reasons:
+            parts.append(", ".join(self.reasons[:2]))
+        return "".join(parts) + mode_note
 
 
 def assess_regime(benchmark: pd.DataFrame | None, config: dict) -> MarketRegime:
@@ -28,8 +41,12 @@ def assess_regime(benchmark: pd.DataFrame | None, config: dict) -> MarketRegime:
         return MarketRegime(
             label="NEUTRAL",
             score=0.5,
+            mode="normal",
             trade_allowed=True,
             min_probability_boost=0.0,
+            min_relative_strength=0.0,
+            min_ml_score=0.0,
+            allowed_tiers=[],
             reasons=["Regime data unavailable"],
         )
 
@@ -69,7 +86,7 @@ def assess_regime(benchmark: pd.DataFrame | None, config: dict) -> MarketRegime:
         reasons.append(f"Nifty RSI {nifty_rsi:.0f} overbought")
     elif nifty_rsi < 35:
         score_parts.append(0.35)
-        reasons.append(f"Nifty RSI {nifty_rsi:.0f} oversold — fragile bounce")
+        reasons.append(f"Nifty RSI {nifty_rsi:.0f} oversold")
     else:
         score_parts.append(0.55)
 
@@ -82,20 +99,51 @@ def assess_regime(benchmark: pd.DataFrame | None, config: dict) -> MarketRegime:
     if score >= 0.72:
         label = "BULLISH"
         boost = 0.0
+        mode = "normal"
+        min_rs = 0.0
+        min_ml = 0.0
+        allowed_tiers: list[str] = []
+        max_picks = None
     elif score >= 0.48:
         label = "NEUTRAL"
         boost = float(regime_cfg.get("neutral_probability_boost", 5.0))
+        mode = "normal"
+        min_rs = 0.0
+        min_ml = 0.0
+        allowed_tiers = []
+        max_picks = None
     else:
         label = "BEARISH"
-        boost = float(regime_cfg.get("bearish_probability_boost", 12.0))
+        boost = float(regime_cfg.get("bearish_probability_boost", 8.0))
+        # selective = still trade stocks beating the index; strict = block all
+        bearish_mode = regime_cfg.get("bearish_mode", "selective")
+        if bearish_mode == "strict" or regime_cfg.get("skip_bearish_days", False):
+            mode = "blocked"
+            min_rs = 1.0  # unreachable — blocks via trade_allowed
+            min_ml = 1.0
+            allowed_tiers = []
+            max_picks = 0
+        else:
+            mode = "selective"
+            min_rs = float(regime_cfg.get("bearish_min_relative_strength", 0.65))
+            min_ml = float(regime_cfg.get("bearish_min_ml_score", 0.50))
+            allowed_tiers = list(
+                regime_cfg.get("bearish_allowed_tiers", ["ELITE", "STRONG"])
+            )
+            max_picks = int(regime_cfg.get("bearish_max_picks", 2))
+            reasons.append("Only index-beating setups allowed")
 
-    skip_bearish = regime_cfg.get("skip_bearish_days", True)
-    trade_allowed = not (skip_bearish and label == "BEARISH")
+    trade_allowed = mode != "blocked"
 
     return MarketRegime(
         label=label,
         score=round(score, 3),
+        mode=mode,
         trade_allowed=trade_allowed,
         min_probability_boost=boost,
+        min_relative_strength=min_rs,
+        min_ml_score=min_ml,
+        allowed_tiers=allowed_tiers,
+        max_picks=max_picks,
         reasons=reasons[:4],
     )
