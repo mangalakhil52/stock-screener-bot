@@ -80,10 +80,43 @@ Chartink Scans (3 setups)
 ### Ranking logic
 
 Stocks are scored on:
-- Volume / liquidity (rupee turnover)
+- Volume / liquidity (rupee turnover, min ₹5 Cr/day)
 - Momentum sweet spot (1.5–6% daily move preferred)
 - Setup type weight
-- Penalty for overextended moves (>8% in one day)
+- **Confluence** — bonus when 2+ scans agree on the same stock
+- Penalty for overextended moves (>8% in one day — rejected)
+
+### Trade management (new)
+
+- **Setup-specific stops/targets** — wider for breakouts, tighter for EMA pullbacks
+- **7-day cooldown** — won't re-recommend a symbol picked in the last week
+- **Exit plan in alerts** — book 50% at T1, move stop to entry after +4%
+
+### 7-layer defense system
+
+No system wins 100% — this bot **prefers no trade over a bad trade** using seven filter layers:
+
+1. Chartink scans → 2. Nifty regime gate → 3. Fake breakout traps → 4. Multi-timeframe alignment → 5. Walk-forward historical edge → 6. Monte Carlo (500 paths) → 7. Ensemble scoring + diversification
+
+| Module | Purpose |
+|--------|---------|
+| `regime_filter.py` | Skip all picks on bearish Nifty days |
+| `ensemble_engine.py` | Wyckoff, S/R, confidence tiers (ELITE/STRONG/PASS) |
+| `monte_carlo.py` | P(hit target before stop) via bootstrap simulation |
+| `diversification.py` | Max 1 pick/sector, correlation < 0.75 |
+
+Picks must pass: min **62%** probability, ensemble ≥ 62%, MC win ≥ 50%, grade A or B only.
+
+### Price filter (₹100 – ₹10,000)
+
+Every Chartink scan includes `latest close > 100 and latest close < 10000`. This is intentional:
+
+| Bound | Reason |
+|-------|--------|
+| **> ₹100** | Excludes penny stocks with thin liquidity and manipulation risk |
+| **< ₹10,000** | Focuses on tradable mid/large caps; very few NSE names trade above this |
+
+Most of your historical picks (₹2,000–₹9,000) sit in the sweet spot where daily turnover is high enough for clean 5–10% swings. Adjust `filters.price_min` / `price_max` in `config.yaml` (and matching scan clauses) if you want a different band.
 
 ---
 
@@ -157,6 +190,14 @@ stock-screener-bot/
 │   ├── main.py          # Orchestrator
 │   ├── chartink_client.py
 │   ├── ranker.py
+│   ├── advanced_analyzer.py  # Ensemble wrapper
+│   ├── ensemble_engine.py    # 7-layer scoring engine
+│   ├── indicators.py         # Technical indicators
+│   ├── regime_filter.py      # Nifty market regime gate
+│   ├── monte_carlo.py        # Path simulation
+│   ├── diversification.py    # Sector & correlation filter
+│   ├── market_data.py        # yfinance OHLCV fetch
+│   ├── trade_history.py      # Cooldown / pick logging
 │   └── notifier.py
 └── scans/
     └── chartink_queries.txt

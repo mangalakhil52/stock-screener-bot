@@ -14,37 +14,62 @@ from ranker import TradePick
 logger = logging.getLogger(__name__)
 
 
-def format_message(picks: list[TradePick], total_scanned: int) -> str:
+def format_message(
+    picks: list[TradePick],
+    total_scanned: int,
+    regime_summary: str | None = None,
+    ml_summary: str | None = None,
+) -> str:
     now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST")
 
     if not picks:
+        regime_line = f"\nMarket: {regime_summary}\n" if regime_summary else ""
         return (
-            f"📊 *Daily Swing Screener* — {now}\n\n"
-            f"No A+ setups today from {total_scanned} candidates.\n"
-            "Stay in cash — discipline beats forcing trades."
+            f"📊 *Daily Swing Screener* — {now}\n"
+            f"{regime_line}\n"
+            f"No elite setups today from {total_scanned} candidates.\n"
+            "🛡️ System chose *no trade* over a risky trade. Stay in cash."
         )
 
     lines = [
-        f"📊 *Daily Swing Picks* — {now}",
-        f"Pool: {total_scanned} stocks → Top {len(picks)} recommendations\n",
-        "⚠️ Not financial advice. Always verify on chart before buying.\n",
+        f"📊 *Elite Swing Picks* — {now}",
+        f"Pool: {total_scanned} stocks → {len(picks)} high-confidence pick(s)\n",
     ]
+    if regime_summary:
+        lines.append(f"📈 Market regime: {regime_summary}\n")
+    if ml_summary:
+        lines.append(f"🤖 ML model: {ml_summary}\n")
+    lines.append("⚠️ Not financial advice. Verify on chart before buying.\n")
 
     for idx, pick in enumerate(picks, start=1):
-        lines.extend(
-            [
-                f"*#{idx} {pick.symbol}* ({pick.setup})",
-                f"   Price: ₹{pick.price:,.2f} ({pick.change_pct:+.2f}%)",
-                f"   Entry: ₹{pick.entry:,.2f}",
-                f"   Stop: ₹{pick.stop_loss:,.2f} (-3%)",
-                f"   Target: ₹{pick.target_low:,.2f} – ₹{pick.target_high:,.2f} (+5–10%)",
-                f"   Score: {pick.score:.2f} | Vol: {pick.volume:,.0f}",
-                f"   _{pick.rationale}_",
-                "",
-            ]
-        )
+        stop_pct = round((1 - pick.stop_loss / pick.entry) * 100, 1) if pick.entry else 0
+        target_min_pct = round((pick.target_low / pick.entry - 1) * 100, 1) if pick.entry else 0
+        target_max_pct = round((pick.target_high / pick.entry - 1) * 100, 1) if pick.entry else 0
+        pick_lines = [
+            f"*#{idx} {pick.symbol}* [{pick.confidence_tier}] grade {pick.grade} ({pick.setup})",
+            f"   🎯 Probability: *{pick.probability:.0f}%* | Ensemble: {pick.ensemble_score:.0%}",
+            f"   📊 MC win: {pick.monte_carlo_win_rate:.0%} | Hist edge: {pick.walk_forward_edge:.0%} | MTF: {pick.mtf_alignment:.0%}",
+            f"   🤖 ML market: {pick.ml_score:.0%} win probability (daily-trained)",
+            f"   Price: ₹{pick.price:,.2f} ({pick.change_pct:+.2f}%)",
+            f"   Entry: ₹{pick.entry:,.2f} | Support: ₹{pick.support_level:,.0f} | Resist: ₹{pick.resistance_level:,.0f}",
+            f"   Stop: ₹{pick.stop_loss:,.2f} (-{stop_pct:.1f}%)",
+            f"   Target: ₹{pick.target_low:,.2f} – ₹{pick.target_high:,.2f} (+{target_min_pct:.0f}–{target_max_pct:.0f}%)",
+            f"   Trap risk: fake BO {pick.fake_breakout_risk:.0%} | fake move {pick.fake_move_risk:.0%}",
+        ]
+        if pick.setup_count > 1:
+            pick_lines.append(f"   Confluence: {pick.confluence}")
+        if pick.confirmations:
+            pick_lines.append(f"   ✓ {pick.confirmations[0]}")
+        if pick.warnings:
+            pick_lines.append(f"   ⚠ {pick.warnings[0]}")
+        pick_lines.extend([
+            f"   _{pick.rationale}_",
+            f"   Exit: {pick.exit_plan}",
+            "",
+        ])
+        lines.extend(pick_lines)
 
-    lines.append("📌 Hold horizon: 5–10 trading days. Exit if stop hits.")
+    lines.append("📌 7-layer filter passed. Book 50% at T1; trail rest with ATR stop.")
     return "\n".join(lines)
 
 
@@ -102,12 +127,23 @@ def send_twilio_sms(message: str) -> bool:
 
 def notify(picks: list[TradePick], total_scanned: int, config: dict) -> None:
     notify_cfg = config.get("notifications", {})
-    # Plain text for SMS/WhatsApp (no markdown)
-    plain_message = format_message(picks, total_scanned).replace("*", "").replace("_", "")
+    regime = config.get("_market_regime")
+    regime_summary = regime.summary if regime else None
+    ml_meta = config.get("_ml_meta")
+    ml_summary = None
+    if ml_meta:
+        ml_summary = (
+            f"{ml_meta.get('samples', 0):,} samples | "
+            f"AUC {ml_meta.get('test_auc', 0):.2f} | "
+            f"trained {ml_meta.get('trained_at', '')[:10]}"
+        )
+
+    msg = format_message(picks, total_scanned, regime_summary, ml_summary)
+    plain_message = msg.replace("*", "").replace("_", "")
 
     sent_any = False
     if notify_cfg.get("telegram", True):
-        if send_telegram(format_message(picks, total_scanned)):
+        if send_telegram(msg):
             sent_any = True
             logger.info("Telegram alert sent")
 
