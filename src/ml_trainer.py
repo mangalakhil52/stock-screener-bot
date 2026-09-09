@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from dhan_client import get_nse_equity_universe, select_training_symbols
+from dhan_client import get_nse_equity_universe
 from market_data import fetch_benchmark, fetch_history
 from ml_features import (
     MARKET_FEATURE_NAMES,
@@ -26,16 +26,12 @@ IST = ZoneInfo("Asia/Kolkata")
 
 
 def load_universe(root: Path, config: dict) -> list[str]:
-    """Full NSE equity universe from Dhan instrument master (no hardcoded list)."""
-    ml_cfg = config.get("ml", {})
+    """Full NSE equity universe from Dhan instrument master (no cap)."""
     try:
-        all_symbols = get_nse_equity_universe(root, config)
+        return get_nse_equity_universe(root, config)
     except Exception:
         logger.exception("Failed to load universe from Dhan")
         return []
-
-    max_sym = int(ml_cfg.get("max_symbols", 250))
-    return select_training_symbols(all_symbols, max_sym)
 
 
 def _model_paths(root: Path, config: dict) -> tuple[Path, Path]:

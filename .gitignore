@@ -2,5 +2,7 @@ __pycache__/
 *.pyc
 .env
 data/cache/
+security_id_list.csv
+dhan_scrip_master.csv
 models/
 logs/

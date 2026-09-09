@@ -156,7 +156,6 @@ ml:
   enabled: true
   auto_train_daily: true
   model_dir: models
-  max_symbols: 200               # Training cap per run (rotates through full universe daily)
   history_days: 365              # 1 year of OHLCV per stock
   batch_size: 40                 # Symbols processed per batch (sequential Dhan fetches)
   label_horizon: 10                # Trading days to check outcome

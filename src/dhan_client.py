@@ -92,8 +92,11 @@ def load_instrument_master(root: Path, config: dict, force_refresh: bool = False
     from dhanhq import dhanhq
 
     logger.info("Downloading Dhan instrument master (compact)...")
-    df = dhanhq.fetch_security_list("compact")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_cache = cache_path.parent / "dhan_scrip_master.csv"
+    df = dhanhq.fetch_security_list("compact", filename=str(csv_cache))
+    if df is None:
+        raise RuntimeError("Failed to download Dhan instrument master")
     try:
         df.to_parquet(cache_path, index=False)
     except Exception:
@@ -125,16 +128,6 @@ def get_nse_equity_universe(root: Path, config: dict) -> list[str]:
     symbols = sorted({str(s).strip().upper() for s in subset if pd.notna(s) and str(s).strip()})
     logger.info("NSE equity universe from Dhan: %s symbols (series %s)", len(symbols), series)
     return symbols
-
-
-def select_training_symbols(symbols: list[str], max_symbols: int) -> list[str]:
-    """Rotate daily through full universe when training cap < market size."""
-    if max_symbols <= 0 or len(symbols) <= max_symbols:
-        return symbols
-    day = datetime.now(IST).toordinal()
-    start = day % len(symbols)
-    rotated = symbols[start:] + symbols[:start]
-    return rotated[:max_symbols]
 
 
 def symbol_to_security_id(symbol: str, root: Path, config: dict) -> str | None:

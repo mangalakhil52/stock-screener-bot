@@ -1,4 +1,4 @@
-"""Tests for Dhan instrument master and universe selection (no API credentials required)."""
+"""Tests for Dhan instrument master and universe (no API credentials required)."""
 
 import sys
 import unittest
@@ -7,21 +7,10 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from dhan_client import select_training_symbols, symbol_to_security_id
+from dhan_client import symbol_to_security_id
 
 
 class DhanUniverseTests(unittest.TestCase):
-    def test_select_training_symbols_rotation(self):
-        universe = [f"S{i}" for i in range(10)]
-        picked = select_training_symbols(universe, 3)
-        self.assertEqual(len(picked), 3)
-        self.assertTrue(all(s in universe for s in picked))
-
-    def test_select_training_symbols_no_cap(self):
-        universe = ["A", "B", "C"]
-        self.assertEqual(select_training_symbols(universe, 0), universe)
-        self.assertEqual(select_training_symbols(universe, 10), universe)
-
     @patch("dhan_client.load_instrument_master")
     def test_symbol_to_security_id(self, mock_load):
         import pandas as pd
