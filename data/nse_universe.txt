@@ -1,3 +1,3 @@
-# DEPRECATED — universe is loaded from Indian API stock list (NSE codes).
-# See config.yaml → indian_api.stock_list_url.
+# DEPRECATED — universe is loaded via NSEPython nse_eq_symbols().
+# See config.yaml → nse section.
 # This file is no longer read by the bot.

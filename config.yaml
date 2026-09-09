@@ -142,17 +142,18 @@ diversification:
   max_per_sector: 1              # No two picks from same sector
   max_correlation: 0.75          # Reject highly correlated pairs
 
-# Indian Stock Market API — NSE universe + OHLCV via https://indianapi.in
-# Credentials: INDIAN_API_KEY in .env or GitHub secrets.
-indian_api:
-  base_url: https://stock.indianapi.in    # dev/analyst/pro URLs per your plan
-  stock_list_url: https://analyst.indianapi.in/static/all_stocks.json
+# NSE data via NSEPython — free, no API key (https://github.com/aeron7/nsepython)
+# Linux/CI: pip install nsepythonserver | Windows: pip install nsepython
+nse:
   universe_cache: data/cache/nse_universe.json
   universe_cache_hours: 24
-  request_delay_sec: 0.05                 # Throttle API calls (avoid 429)
-  benchmark_symbols: ["NIFTYBEES", "NIFTY"] # Nifty proxy for regime filter
+  ohlcv_cache_dir: data/cache/ohlcv
+  ohlcv_cache_hours: 24
+  equity_series: EQ
+  request_delay_sec: 0.2                # Pause between NSE requests
+  benchmark_index: "NIFTY 50"
 
-# Daily self-training ML on whole NSE universe (Indian API + scikit-learn).
+# Daily self-training ML on whole NSE universe (NSEPython + scikit-learn).
 # Retrains automatically once per day when you run the bot.
 ml:
   enabled: true

@@ -24,21 +24,14 @@ python -m pip install -r requirements.txt
 
 > **Note:** If `pip install` fails with "Unable to create process", use `python -m pip` instead — your `pip` shortcut may point to an old Python install.
 
-### 2. Set up Indian API (required for NSE market data)
+### 2. NSE market data (NSEPython — free, no API key)
 
-The bot uses **[Indian Stock Market API](https://indianapi.in/indian-stock-market)** for OHLCV history and the full NSE universe (no hardcoded symbol list, no yfinance).
+The bot uses **[NSEPython](https://github.com/aeron7/nsepython)** for OHLCV history and the full NSE equity universe (~2,500+ symbols). No API key, no rate-limited third-party plan.
 
-1. Sign up at [indianapi.in/indian-stock-market](https://indianapi.in/indian-stock-market) (free tier works)
-2. Dashboard → **API / Manage Keys** → copy your **API key**
-3. Copy `.env.example` to `.env` in the project root and add:
+- **Linux / GitHub Actions:** `nsepythonserver` (installed via `requirements.txt`)
+- **Windows laptop:** you can use `pip install nsepython` instead if the server edition fails
 
-```
-INDIAN_API_KEY=your_api_key
-```
-
-**GitHub Actions:** add repository secret `INDIAN_API_KEY` (`Settings → Secrets and variables → Actions`).
-
-If you upgraded plans, also set `INDIAN_API_BASE_URL` to your plan URL (`stock`, `dev`, `analyst`, or `pro` subdomain on `indianapi.in`).
+OHLCV is cached under `data/cache/ohlcv/` so repeat runs are faster.
 
 ### 3. Set up Telegram (recommended — free)
 
@@ -214,8 +207,8 @@ stock-screener-bot/
 │   ├── regime_filter.py      # Nifty market regime gate
 │   ├── monte_carlo.py        # Path simulation
 │   ├── diversification.py    # Sector & correlation filter
-│   ├── indian_api_client.py  # Indian API + dynamic NSE universe
-│   ├── market_data.py        # NSE OHLCV fetch via Indian API
+│   ├── nse_client.py         # NSEPython universe + OHLCV
+│   ├── market_data.py        # NSE OHLCV fetch
 │   ├── trade_history.py      # Cooldown / pick logging
 │   └── notifier.py
 └── scans/
