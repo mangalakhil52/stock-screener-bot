@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from dhan_client import get_nse_equity_universe
+from indian_api_client import get_nse_equity_universe
 from market_data import fetch_benchmark, fetch_history
 from ml_features import (
     MARKET_FEATURE_NAMES,
@@ -26,7 +26,7 @@ IST = ZoneInfo("Asia/Kolkata")
 
 
 def load_universe(root: Path, config: dict) -> list[str]:
-    """Full NSE equity universe from Dhan instrument master (no cap)."""
+    """Full NSE equity universe from Indian API stock list (no cap)."""
     try:
         return get_nse_equity_universe(root, config)
     except Exception:

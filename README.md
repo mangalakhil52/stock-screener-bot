@@ -24,26 +24,21 @@ python -m pip install -r requirements.txt
 
 > **Note:** If `pip install` fails with "Unable to create process", use `python -m pip` instead — your `pip` shortcut may point to an old Python install.
 
-### 2. Set up Dhan API (required for market data)
+### 2. Set up Indian API (required for NSE market data)
 
-The bot uses **Dhan** for OHLCV history and the full NSE equity universe (no hardcoded symbol list).
+The bot uses **[Indian Stock Market API](https://indianapi.in/indian-stock-market)** for OHLCV history and the full NSE universe (no hardcoded symbol list, no yfinance).
 
-1. Log in at [web.dhan.co](https://web.dhan.co) → **Profile** → **DhanHQ Trading APIs**
-2. Note your **Client ID**
-3. Click **Generate Access Token** (or use a static token if you enabled it)
-4. Copy `.env.example` to `.env` in the project root and add:
+1. Sign up at [indianapi.in/indian-stock-market](https://indianapi.in/indian-stock-market) (free tier works)
+2. Dashboard → **API / Manage Keys** → copy your **API key**
+3. Copy `.env.example` to `.env` in the project root and add:
 
 ```
-DHAN_CLIENT_ID=your_client_id
-DHAN_ACCESS_TOKEN=your_access_token
+INDIAN_API_KEY=your_api_key
 ```
 
-**GitHub Actions:** add the same two values as repository secrets (`Settings → Secrets and variables → Actions`):
+**GitHub Actions:** add repository secret `INDIAN_API_KEY` (`Settings → Secrets and variables → Actions`).
 
-- `DHAN_CLIENT_ID`
-- `DHAN_ACCESS_TOKEN`
-
-> Access tokens expire (~24h for generated tokens). For daily GitHub runs, use a **static access token** from the Dhan API page, or refresh the secret when training fails.
+If you upgraded plans, also set `INDIAN_API_BASE_URL` to your plan URL (`stock`, `dev`, `analyst`, or `pro` subdomain on `indianapi.in`).
 
 ### 3. Set up Telegram (recommended — free)
 
@@ -219,8 +214,8 @@ stock-screener-bot/
 │   ├── regime_filter.py      # Nifty market regime gate
 │   ├── monte_carlo.py        # Path simulation
 │   ├── diversification.py    # Sector & correlation filter
-│   ├── dhan_client.py        # Dhan API + dynamic NSE universe
-│   ├── market_data.py        # Dhan OHLCV fetch
+│   ├── indian_api_client.py  # Indian API + dynamic NSE universe
+│   ├── market_data.py        # NSE OHLCV fetch via Indian API
 │   ├── trade_history.py      # Cooldown / pick logging
 │   └── notifier.py
 └── scans/

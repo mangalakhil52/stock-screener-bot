@@ -27,8 +27,8 @@ jobs:
       - name: Run Screener Bot
         env:
           PYTHONPATH: src
-          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
-          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          INDIAN_API_KEY: ${{ secrets.INDIAN_API_KEY }}
+          INDIAN_API_BASE_URL: ${{ secrets.INDIAN_API_BASE_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python src/main.py

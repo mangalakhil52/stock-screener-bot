@@ -1,3 +1,3 @@
-# DEPRECATED — universe is loaded dynamically from Dhan instrument master.
-# See config.yaml → dhan.universe_series.
+# DEPRECATED — universe is loaded from Indian API stock list (NSE codes).
+# See config.yaml → indian_api.stock_list_url.
 # This file is no longer read by the bot.
