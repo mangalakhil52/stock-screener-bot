@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+.env
+data/cache/
+models/
+logs/

@@ -24,21 +24,44 @@ python -m pip install -r requirements.txt
 
 > **Note:** If `pip install` fails with "Unable to create process", use `python -m pip` instead — your `pip` shortcut may point to an old Python install.
 
-### 2. Set up Telegram (recommended — free)
+### 2. Set up Dhan API (required for market data)
+
+The bot uses **Dhan** for OHLCV history and the full NSE equity universe (no hardcoded symbol list).
+
+1. Log in at [web.dhan.co](https://web.dhan.co) → **Profile** → **DhanHQ Trading APIs**
+2. Note your **Client ID**
+3. Click **Generate Access Token** (or use a static token if you enabled it)
+4. Copy `.env.example` to `.env` in the project root and add:
+
+```
+DHAN_CLIENT_ID=your_client_id
+DHAN_ACCESS_TOKEN=your_access_token
+```
+
+**GitHub Actions:** add the same two values as repository secrets (`Settings → Secrets and variables → Actions`):
+
+- `DHAN_CLIENT_ID`
+- `DHAN_ACCESS_TOKEN`
+
+> Access tokens expire (~24h for generated tokens). For daily GitHub runs, use a **static access token** from the Dhan API page, or refresh the secret when training fails.
+
+### 3. Set up Telegram (recommended — free)
 
 1. Open Telegram → search **@BotFather** → `/newbot` → copy the **bot token**
 2. Start a chat with your new bot (send any message)
 3. Get your chat ID:
    - Visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
    - Find `"chat":{"id":123456789}` in the JSON
-4. Copy `.env.example` to `.env` and fill in:
+4. Add to `.env`:
 
 ```
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 ```
 
-### 3. Run manually
+For GitHub Actions, also set secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+
+### 4. Run manually
 
 ```powershell
 python src\main.py
@@ -46,7 +69,7 @@ python src\main.py
 
 You should receive a Telegram message with top 2–3 picks.
 
-### 4. Schedule daily (Windows Task Scheduler)
+### 5. Schedule daily (Windows Task Scheduler)
 
 1. Open **Task Scheduler** → Create Basic Task
 2. Trigger: Daily at **3:45 PM** (after market close) or **9:00 AM** (before open)
@@ -196,7 +219,8 @@ stock-screener-bot/
 │   ├── regime_filter.py      # Nifty market regime gate
 │   ├── monte_carlo.py        # Path simulation
 │   ├── diversification.py    # Sector & correlation filter
-│   ├── market_data.py        # yfinance OHLCV fetch
+│   ├── dhan_client.py        # Dhan API + dynamic NSE universe
+│   ├── market_data.py        # Dhan OHLCV fetch
 │   ├── trade_history.py      # Cooldown / pick logging
 │   └── notifier.py
 └── scans/

@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
+from dhan_client import get_nse_equity_universe, select_training_symbols
 from market_data import fetch_benchmark, fetch_history
 from ml_features import (
     MARKET_FEATURE_NAMES,
@@ -25,22 +26,16 @@ IST = ZoneInfo("Asia/Kolkata")
 
 
 def load_universe(root: Path, config: dict) -> list[str]:
+    """Full NSE equity universe from Dhan instrument master (no hardcoded list)."""
     ml_cfg = config.get("ml", {})
-    universe_file = root / ml_cfg.get("universe_file", "data/nse_universe.txt")
-    if not universe_file.exists():
-        logger.warning("Universe file missing: %s", universe_file)
+    try:
+        all_symbols = get_nse_equity_universe(root, config)
+    except Exception:
+        logger.exception("Failed to load universe from Dhan")
         return []
 
-    symbols: list[str] = []
-    seen: set[str] = set()
-    for line in universe_file.read_text(encoding="utf-8").splitlines():
-        sym = line.strip().upper()
-        if sym and not sym.startswith("#") and sym not in seen:
-            seen.add(sym)
-            symbols.append(sym)
-
     max_sym = int(ml_cfg.get("max_symbols", 250))
-    return symbols[:max_sym]
+    return select_training_symbols(all_symbols, max_sym)
 
 
 def _model_paths(root: Path, config: dict) -> tuple[Path, Path]:
@@ -130,11 +125,11 @@ def train_market_model(root: Path, config: dict) -> dict | None:
     all_y: list[int] = []
     symbols_loaded = 0
 
-    benchmark = fetch_benchmark(history_days)
+    benchmark = fetch_benchmark(history_days, config)
 
     for i in range(0, len(symbols), batch_size):
         chunk = symbols[i : i + batch_size]
-        history, _ = fetch_history(chunk, days=history_days)
+        history, _ = fetch_history(chunk, days=history_days, config=config)
         for sym, df in history.items():
             if df is None or len(df) < 80:
                 continue

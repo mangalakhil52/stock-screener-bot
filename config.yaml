@@ -142,16 +142,23 @@ diversification:
   max_per_sector: 1              # No two picks from same sector
   max_correlation: 0.75          # Reject highly correlated pairs
 
-# Daily self-training ML on whole NSE universe (yfinance + scikit-learn).
+# Dhan API — market data + dynamic NSE universe (no hardcoded symbol list).
+# Credentials: DHAN_CLIENT_ID + DHAN_ACCESS_TOKEN in .env or GitHub secrets.
+dhan:
+  instrument_cache: data/cache/dhan_instruments.parquet
+  instrument_cache_hours: 24
+  universe_series: ["EQ", "BE", "SM"]   # NSE cash: main board + SME/BE
+  request_delay_sec: 0.05               # Throttle historical API calls
+
+# Daily self-training ML on whole NSE universe (Dhan OHLCV + scikit-learn).
 # Retrains automatically once per day when you run the bot.
 ml:
   enabled: true
   auto_train_daily: true
   model_dir: models
-  universe_file: data/nse_universe.txt
-  max_symbols: 200               # How many stocks to train on (batched)
+  max_symbols: 200               # Training cap per run (rotates through full universe daily)
   history_days: 365              # 1 year of OHLCV per stock
-  batch_size: 40                 # yfinance download batch size
+  batch_size: 40                 # Symbols processed per batch (sequential Dhan fetches)
   label_horizon: 10                # Trading days to check outcome
   target_pct: 5.0                  # Label = hit +5% before -3%
   stop_pct: 3.0

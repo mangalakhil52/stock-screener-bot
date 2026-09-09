@@ -191,7 +191,7 @@ def _run_advanced_analysis(
     days = int(adv.get("history_days", 90))
     logger.info("Running ensemble analysis on %s symbols...", len(symbols))
 
-    history, benchmark = fetch_history(symbols, days=days)
+    history, benchmark = fetch_history(symbols, days=days, config=config)
     setups = {c.symbol: c.primary_setup for c in candidates}
     signals = analyze_batch(symbols, history, benchmark, setups, config)
 
